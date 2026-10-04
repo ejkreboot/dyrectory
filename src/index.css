@@ -1,0 +1,51 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/source-serif-4";
+@import "tailwindcss";
+
+/* Muted, paper-and-ink palette. Everything in the UI is built from these tokens. */
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Source Serif 4 Variable", ui-serif, Georgia, serif;
+
+  --color-paper: #f6f5f2;
+  --color-surface: #ffffff;
+  --color-sunken: #efeee9;
+  --color-line: #e3e1db;
+  --color-line-strong: #cfccc4;
+
+  --color-ink: #2a2c2e;
+  --color-ink-muted: #63676a;
+  --color-ink-faint: #969a9c;
+
+  --color-accent: #4a6163;
+  --color-accent-strong: #3a4e50;
+  --color-accent-soft: #e5ebeb;
+
+  --color-danger: #974a41;
+  --color-danger-soft: #f5eae8;
+  --color-ok: #5c705d;
+  --color-ok-soft: #e9eee8;
+  --color-warn: #8f7134;
+  --color-warn-soft: #f4efe2;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-paper text-ink font-sans;
+    font-feature-settings: "cv11", "ss01";
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent/60;
+  }
+  ::selection {
+    @apply bg-accent/20;
+  }
+  dialog::backdrop {
+    background: rgb(42 44 46 / 0.35);
+    backdrop-filter: blur(2px);
+  }
+}
