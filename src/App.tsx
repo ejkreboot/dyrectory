@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { AuthProvider } from "./auth/AuthProvider";
 import { RequireAuth } from "./auth/RequireAuth";
@@ -9,6 +10,10 @@ import { SetPasswordPage } from "./pages/SetPasswordPage";
 import { FilesPage } from "./pages/FilesPage";
 import { TasksPage } from "./pages/TasksPage";
 import { MembersPage } from "./pages/MembersPage";
+import { FullPageSpinner } from "./components/ui/controls";
+
+// pdf.js is large, so the form filler loads only when it's opened.
+const FillPage = lazy(() => import("./pages/FillPage").then((m) => ({ default: m.FillPage })));
 
 export function App() {
   return (
@@ -19,6 +24,16 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/set-password" element={<SetPasswordPage />} />
+            <Route
+              path="/fill/:fileId"
+              element={
+                <RequireAuth>
+                  <Suspense fallback={<FullPageSpinner />}>
+                    <FillPage />
+                  </Suspense>
+                </RequireAuth>
+              }
+            />
             <Route
               element={
                 <RequireAuth>

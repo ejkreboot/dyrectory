@@ -5,7 +5,9 @@ import {
   CloudUpload,
   Download,
   ExternalLink,
+  FilePenLine,
   FolderInput,
+  History,
   FolderPlus,
   ListChecks,
   LoaderCircle,
@@ -24,20 +26,23 @@ import { FileIcon, FolderIcon } from "../components/files/FileIcon";
 import { MoveDialog } from "../components/files/MoveDialog";
 import { NameDialog } from "../components/files/NameDialog";
 import { TaskDialog } from "../components/tasks/TaskDialog";
+import { VersionHistoryDialog } from "../components/files/VersionHistoryDialog";
 import {
   baseNameLength,
   deleteFile,
   deleteFolder,
   downloadFile,
   fetchFolders,
-  FILE_COLUMNS,
+  FILE_LIST_SELECT,
   folderPathLabel,
   folderTrail,
+  isPdf,
   isUniqueViolation,
   openFile,
   sortByName,
   uniqueName,
   uploadFile,
+  versionCount,
 } from "../lib/files";
 import { errorMessage, firstName, formatBytes, formatDate } from "../lib/format";
 import { supabase } from "../lib/supabase";
@@ -53,6 +58,7 @@ type DialogState =
   | { kind: "delete-folder"; folder: Folder }
   | { kind: "delete-file"; file: FileRecord }
   | { kind: "task"; file: FileRecord }
+  | { kind: "versions"; file: FileRecord }
   | null;
 
 interface UploadItem {
@@ -61,8 +67,6 @@ interface UploadItem {
   status: "waiting" | "uploading" | "failed";
   error?: string;
 }
-
-const FILE_SELECT = `${FILE_COLUMNS}, task_files(count)`;
 
 function linkedTaskCount(file: FileRecord): number {
   return file.task_files?.[0]?.count ?? 0;
@@ -99,7 +103,7 @@ export function FilesPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const base = supabase.from("files").select(FILE_SELECT);
+    const base = supabase.from("files").select(FILE_LIST_SELECT);
     const scoped = folderId ? base.eq("folder_id", folderId) : base.is("folder_id", null);
     scoped.then(({ data, error }) => {
       if (cancelled) return;
@@ -123,7 +127,7 @@ export function FilesPage() {
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       const pattern = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-      const { data, error } = await supabase.from("files").select(FILE_SELECT).ilike("name", pattern).limit(200);
+      const { data, error } = await supabase.from("files").select(FILE_LIST_SELECT).ilike("name", pattern).limit(200);
       if (cancelled) return;
       if (error) toast.error(errorMessage(error));
       else setResults(sortByName(data as FileRecord[]));
@@ -255,10 +259,17 @@ export function FilesPage() {
   function fileMenu(file: FileRecord): MenuItem[] {
     return [
       { label: "Open", icon: <ExternalLink />, onSelect: () => run(() => openFile(file)) },
+      { label: "Fill in form", icon: <FilePenLine />, hidden: !isPdf(file), onSelect: () => navigate(`/fill/${file.id}`) },
       { label: "Download", icon: <Download />, onSelect: () => run(() => downloadFile(file)) },
       { label: "Add a to-do for this", icon: <ListChecks />, onSelect: () => setDialog({ kind: "task", file }) },
       { label: "Rename", icon: <Pencil />, onSelect: () => setDialog({ kind: "rename-file", file }) },
       { label: "Move to…", icon: <FolderInput />, onSelect: () => setDialog({ kind: "move-file", file }) },
+      {
+        label: "Version history",
+        icon: <History />,
+        hidden: versionCount(file) < 2,
+        onSelect: () => setDialog({ kind: "versions", file }),
+      },
       { label: "Delete", icon: <Trash2 />, tone: "danger", onSelect: () => setDialog({ kind: "delete-file", file }) },
     ];
   }
@@ -285,6 +296,7 @@ export function FilesPage() {
 
   function fileRow(file: FileRecord, showPath = false) {
     const count = linkedTaskCount(file);
+    const versions = versionCount(file);
     const uploader = file.uploaded_by ? people.get(file.uploaded_by) : null;
     return (
       <Row
@@ -293,7 +305,21 @@ export function FilesPage() {
         icon={<FileIcon mime={file.mime_type} name={file.name} />}
         name={file.name}
         badge={
-          count > 0 && (
+          <>
+            {versions > 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDialog({ kind: "versions", file });
+                }}
+                className="shrink-0 rounded-full bg-sunken px-2 py-0.5 text-[11px] font-medium text-ink-muted hover:bg-line hover:text-ink"
+                title="See version history"
+              >
+                v{versions}
+              </button>
+            )}
+            {count > 0 && (
             <Link
               to={`/tasks?file=${file.id}`}
               onClick={(e) => e.stopPropagation()}
@@ -303,7 +329,8 @@ export function FilesPage() {
               <ListChecks className="size-3" />
               {count} {count === 1 ? "to-do" : "to-dos"}
             </Link>
-          )
+            )}
+          </>
         }
         subtitle={showPath ? folderPathLabel(file.folder_id, folderById) : undefined}
         size={formatBytes(file.size_bytes)}
@@ -516,6 +543,12 @@ export function FilesPage() {
           </>
         )}
       </ConfirmDialog>
+      <VersionHistoryDialog
+        file={dialog?.kind === "versions" ? dialog.file : null}
+        peopleById={people}
+        onClose={closeDialog}
+        onRestored={reload}
+      />
       <TaskDialog
         open={dialog?.kind === "task"}
         initialFiles={dialog?.kind === "task" ? [dialog.file] : undefined}

@@ -35,6 +35,21 @@ export interface FileRecord {
   updated_at: string;
   /** Present when selected with `task_files(count)`. */
   task_files?: { count: number }[];
+  /** Present when selected with `file_versions(count)`. */
+  file_versions?: { count: number }[];
+}
+
+export type VersionKind = "uploaded" | "filled" | "replaced" | "restored";
+
+export interface FileVersion {
+  id: string;
+  file_id: string;
+  storage_path: string;
+  size_bytes: number;
+  mime_type: string | null;
+  kind: VersionKind;
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface Task {

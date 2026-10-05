@@ -1,0 +1,11 @@
+/* pdf.js form fields, retinted from its default bright blue to the app's slate accent. */
+.estate-pdf .annotationLayer {
+  --annotation-unfocused-field-background: url("data:image/svg+xml;charset=UTF-8,<svg width='1px' height='1px' xmlns='http://www.w3.org/2000/svg'><rect width='100%' height='100%' style='fill:rgba(74, 97, 99, 0.12);'/></svg>");
+  --annotation-unfocused-field-filter: url("data:image/svg+xml;charset=UTF-8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='estateFillableField' x='0%' y='0%' width='100%' height='100%' color-interpolation-filters='sRGB'><feFlood flood-color='rgb(74,97,99)' flood-opacity='0.12' result='f'/><feComposite in='f' in2='SourceGraphic' operator='over'/></filter></svg>#estateFillableField");
+  --input-focus-border-color: #4a6163;
+  --input-hover-border-color: #969a9c;
+}
+
+.estate-pdf .pdfViewer .page {
+  box-shadow: 0 1px 3px rgb(42 44 46 / 0.12), 0 1px 2px rgb(42 44 46 / 0.08);
+}

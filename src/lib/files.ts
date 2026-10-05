@@ -1,8 +1,18 @@
 import { BUCKET, MAX_UPLOAD_BYTES, supabase } from "./supabase";
 import { formatBytes } from "./format";
-import type { FileRecord, Folder } from "./types";
+import type { FileRecord, FileVersion, Folder } from "./types";
 
 export const FILE_COLUMNS = "id, folder_id, name, storage_path, size_bytes, mime_type, uploaded_by, created_at, updated_at";
+/** For file listings: also counts linked to-dos and stored versions. */
+export const FILE_LIST_SELECT = `${FILE_COLUMNS}, task_files(count), file_versions(count)`;
+
+export function isPdf(file: Pick<FileRecord, "name" | "mime_type">): boolean {
+  return file.mime_type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+export function versionCount(file: FileRecord): number {
+  return file.file_versions?.[0]?.count ?? 1;
+}
 
 export async function fetchFolders(): Promise<Folder[]> {
   const { data, error } = await supabase.from("folders").select("*").order("name");
@@ -105,9 +115,55 @@ async function removeObjects(paths: string[]) {
 }
 
 export async function deleteFile(file: FileRecord): Promise<void> {
+  const { data: versions, error: versionError } = await supabase
+    .from("file_versions")
+    .select("storage_path")
+    .eq("file_id", file.id);
+  if (versionError) throw versionError;
   const { error } = await supabase.from("files").delete().eq("id", file.id);
   if (error) throw error;
-  await removeObjects([file.storage_path]);
+  await removeObjects([...new Set([file.storage_path, ...(versions ?? []).map((v) => v.storage_path as string)])]);
+}
+
+/** Stores new content for a file (e.g. a filled-in form). The previous content stays in its history. */
+export async function saveNewVersion(
+  file: Pick<FileRecord, "id" | "name">,
+  content: Blob,
+  kind: "filled" | "replaced",
+): Promise<void> {
+  const path = storageKey(crypto.randomUUID(), file.name);
+  const contentType = content.type || "application/octet-stream";
+  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, content, { contentType });
+  if (uploadError) throw uploadError;
+
+  const { error } = await supabase.rpc("replace_file_content", {
+    target: file.id,
+    new_path: path,
+    new_size: content.size,
+    new_mime: content.type || null,
+    change_kind: kind,
+  });
+  if (error) {
+    await supabase.storage.from(BUCKET).remove([path]);
+    throw error;
+  }
+}
+
+/** Newest first; the first entry is the current content. */
+export async function fetchVersions(fileId: string): Promise<FileVersion[]> {
+  const { data, error } = await supabase
+    .from("file_versions")
+    .select("*")
+    .eq("file_id", fileId)
+    .order("created_at", { ascending: false })
+    .order("id");
+  if (error) throw error;
+  return data as FileVersion[];
+}
+
+export async function restoreVersion(versionId: string): Promise<void> {
+  const { error } = await supabase.rpc("restore_file_version", { version: versionId });
+  if (error) throw error;
 }
 
 export async function deleteFolder(folder: Folder): Promise<void> {
@@ -126,7 +182,7 @@ async function signedUrl(file: Pick<FileRecord, "storage_path" | "name">, downlo
   return data.signedUrl;
 }
 
-/** Opens a file in a new tab. The tab is opened synchronously so popup blockers allow it. */
+/** Opens a file (or a stored version) in a new tab. The tab is opened synchronously so popup blockers allow it. */
 export async function openFile(file: Pick<FileRecord, "storage_path" | "name">): Promise<void> {
   const tab = window.open("", "_blank");
   try {

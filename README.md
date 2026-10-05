@@ -3,6 +3,7 @@
 A small private web app for managing a family estate together:
 
 - **Documents**: a password-protected shared folder, like Dropbox. Upload by button or drag and drop, create nested folders, rename, move, download, search.
+- **PDF forms**: open a fillable PDF in the browser, type into its fields on the page, and save. Each save becomes a new version; earlier versions stay in the file's version history and can be opened, downloaded, or restored.
 - **To-do**: a shared task list with due dates, assignees, notes, and links to any uploaded documents.
 - **Members** (admins only): add people with a temporary password, reset passwords, revoke or restore access, and promote other admins.
 
@@ -15,6 +16,7 @@ Stack: React + Vite + Tailwind on the front end; Supabase Auth, Postgres (row-le
 - New members get a **temporary password** and must choose their own the first time they sign in. "Forgot password" sends a reset email.
 - **Revoke access** takes effect on the person's very next request, because row-level security checks `is_active` on every query and storage request.
 - Files live in a **private** bucket (`estate-files`). The browser only ever gets 60-second signed URLs.
+- A file's content can only change through two database functions (`replace_file_content`, `restore_file_version`), which always record a version. Members can rename and move files directly, but can't overwrite content or edit the history.
 
 ### Shared Supabase project
 
@@ -46,9 +48,10 @@ npm run dev          # http://localhost:5180
 
 ## First-time setup (already done for the Dev project)
 
-1. Apply the schema:
+1. Apply the schema, in order:
    ```sh
    supabase db query --linked -f supabase/migrations/20261003000000_estate_schema.sql
+   supabase db query --linked -f supabase/migrations/20261004000000_file_versions.sql
    ```
 2. Deploy the admin function:
    ```sh
@@ -71,7 +74,12 @@ It's a static site. Build with `npm run build` and host `dist/` anywhere (Netlif
 ## Limits and notes
 
 - Maximum upload size is 50 MB per file (the bucket limit; the Supabase free plan's global cap is also 50 MB).
-- Deleting a folder deletes everything inside it. Deleting a file removes it from any to-dos that referenced it, but the to-dos stay.
+- Deleting a folder deletes everything inside it, including every stored version. Deleting a file removes it from any to-dos that referenced it, but the to-dos stay.
+- The form filler uses [pdf.js](https://mozilla.github.io/pdf.js/) and loads only when a form is opened. Its fonts and decoders are served from the app itself at `/pdfjs/` (see `vite.config.ts`), not from a CDN. Limits:
+  - Scripts embedded in forms (auto-calculated totals, input formatting) don't run.
+  - Older Adobe XFA forms may not fill correctly; the page warns when it sees one.
+  - Signatures still need to be done on paper.
+  - If a saved field's text was broken mid-word (very narrow box or very large font), re-editing that field can keep a line break at that spot.
 - Password-reset emails use Supabase's built-in mailer, which is rate-limited. Configure custom SMTP in the dashboard if you rely on them.
 
 ## Project layout
@@ -81,9 +89,9 @@ src/
   auth/            session + profile context, route guard
   components/      layout, dialogs, file and task components, UI primitives
   lib/             supabase client, file operations, admin API client, formatting
-  pages/           Login, ForgotPassword, SetPassword, Files, Tasks, Members
+  pages/           Login, ForgotPassword, SetPassword, Files, Fill (PDF forms), Tasks, Members
 supabase/
-  migrations/      estate schema, RLS policies, storage bucket + policies
+  migrations/      estate schema, RLS policies, storage bucket + policies, file version history
   functions/estate-admin/   admin-only member management (service role)
 scripts/create-admin.mjs    bootstrap an administrator
 ```
