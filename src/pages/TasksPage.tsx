@@ -8,6 +8,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { FILE_COLUMNS, openFile } from "../lib/files";
 import { errorMessage, firstName, formatDate, formatDueDate, isOverdue, parseLocalDate, startOfToday } from "../lib/format";
 import { supabase } from "../lib/supabase";
+import { notifyTasksChanged } from "../lib/useMyOpenTaskCount";
 import { useProfiles } from "../lib/useProfiles";
 import type { FileRecord, Task } from "../lib/types";
 
@@ -126,6 +127,8 @@ export function TasksPage() {
     if (error) {
       toast.error(errorMessage(error));
       reload();
+    } else {
+      notifyTasksChanged();
     }
   }
 

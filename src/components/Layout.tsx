@@ -4,10 +4,11 @@ import type { ReactNode } from "react";
 import { useAuth } from "../auth/AuthProvider";
 import { APP_NAME } from "../lib/supabase";
 import { personName } from "../lib/format";
+import { useMyOpenTaskCount } from "../lib/useMyOpenTaskCount";
 import { cx, IconButton } from "./ui/controls";
 import { Logo } from "./Logo";
 
-function NavItem({ to, icon, children }: { to: string; icon: ReactNode; children: ReactNode }) {
+function NavItem({ to, icon, badge, children }: { to: string; icon: ReactNode; badge?: ReactNode; children: ReactNode }) {
   return (
     <NavLink
       to={to}
@@ -20,6 +21,7 @@ function NavItem({ to, icon, children }: { to: string; icon: ReactNode; children
     >
       {icon}
       {children}
+      {badge}
     </NavLink>
   );
 }
@@ -28,13 +30,27 @@ export function Layout() {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const isAdmin = profile?.role === "admin";
+  const myOpenTasks = useMyOpenTaskCount();
 
   const nav = (
     <>
       <NavItem to="/files" icon={<FolderClosed />}>
         Documents
       </NavItem>
-      <NavItem to="/tasks" icon={<ListChecks />}>
+      <NavItem
+        to="/tasks"
+        icon={<ListChecks />}
+        badge={
+          myOpenTasks ? (
+            <span
+              className="ml-auto min-w-5 rounded-full bg-danger px-1.5 text-center text-[11px] leading-5 font-semibold text-white tabular-nums"
+              aria-label={`${myOpenTasks} open ${myOpenTasks === 1 ? "task" : "tasks"} assigned to you`}
+            >
+              {myOpenTasks > 99 ? "99+" : myOpenTasks}
+            </span>
+          ) : null
+        }
+      >
         To-do
       </NavItem>
       {isAdmin && (

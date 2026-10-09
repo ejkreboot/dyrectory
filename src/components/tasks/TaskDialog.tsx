@@ -8,6 +8,7 @@ import { FilePicker } from "./FilePicker";
 import { openFile } from "../../lib/files";
 import { errorMessage, formatDateTime, personName } from "../../lib/format";
 import { supabase } from "../../lib/supabase";
+import { notifyTasksChanged } from "../../lib/useMyOpenTaskCount";
 import type { FileRecord, Profile, Task } from "../../lib/types";
 
 type AttachedFile = Pick<FileRecord, "id" | "name" | "mime_type" | "storage_path">;
@@ -81,6 +82,7 @@ export function TaskDialog({ open, task, initialFiles, members, peopleById, onCl
       }
 
       toast.success(task ? "Task updated" : "Task added");
+      notifyTasksChanged();
       onSaved();
       onClose();
     } catch (err) {
@@ -100,6 +102,7 @@ export function TaskDialog({ open, task, initialFiles, members, peopleById, onCl
       return;
     }
     toast.success("Task deleted");
+    notifyTasksChanged();
     onSaved();
     onClose();
   }

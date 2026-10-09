@@ -7,5 +7,8 @@
 }
 
 .estate-pdf .pdfViewer .page {
+  /* pdf.js sizes the page box to the full page and expects its 9px border outside that width. Tailwind's
+     preflight makes it border-box, which shrinks the canvas by 18px but not the form and text layers. */
+  box-sizing: content-box;
   box-shadow: 0 1px 3px rgb(42 44 46 / 0.12), 0 1px 2px rgb(42 44 46 / 0.08);
 }
